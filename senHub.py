@@ -37,14 +37,31 @@ class SenHub:
 
     def set_token(self):
         '''
-        Fetch Tooken from sentinelhub api to be used for available dates 
+        Get OAuth2 token using the Sentinel Hub authentication endpoint.
         '''
         client_id = self.config.sh_client_id
         client_secret = self.config.sh_client_secret
+
+        if not client_id or not client_secret:
+            raise ValueError("Client ID and secret must be set in the config")
+
+        token_url = "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token"
         client = BackendApplicationClient(client_id=client_id)
+        print(f"checking client {client}")
         oauth = OAuth2Session(client=client)
-        token = oauth.fetch_token(token_url='https://services.sentinel-hub.com/oauth/token',client_secret=client_secret)
-        self.token =  token['access_token']
+
+        try:
+            token = oauth.fetch_token(
+                token_url=token_url,
+                client_secret=client_secret,
+                include_client_id=True
+            )
+            self.token = token["access_token"]
+            self.session = oauth  # you can reuse this session to make further requests
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise RuntimeError("Failed to fetch access token")
 
     def get_input_data(self, date):
         '''

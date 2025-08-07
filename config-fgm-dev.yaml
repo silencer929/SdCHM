@@ -13,9 +13,9 @@ Us:
   Logo: amundata_logo.png
   Location: Sudan
 Sentinel:
-  InstanceId: 5f81bca4-38cf-4d05-967a-c7978a35f218     
-  ClientId: 8db06dd5-31fe-4043-bc1e-a78952326f7a    
-  ClientSecret: 8967ItV48X6aBIMhQYMWWtoohLzKxXRumlkS6ads
+  InstanceId: 456e94d0-903b-4abd-83a5-0d63d3869500     
+  ClientId: da441cb3-4cc8-4d59-ad27-d20c26a5dc13 
+  ClientSecret: wncMObciSrKd2iB2j6zc7bm2OIiN9yjf
 
 StartDate : 2020-06-01
 appSemanticVersion: 0.9.3

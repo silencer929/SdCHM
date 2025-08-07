@@ -1,0 +1,7 @@
+Requirement already satisfied: fiona in c:\users\admin\desktop\jobs\doris\satellite-driven crop health monitoring\venv\lib\site-packages (1.10.1)
+Requirement already satisfied: attrs>=19.2.0 in c:\users\admin\desktop\jobs\doris\satellite-driven crop health monitoring\venv\lib\site-packages (from fiona) (25.3.0)
+Requirement already satisfied: certifi in c:\users\admin\desktop\jobs\doris\satellite-driven crop health monitoring\venv\lib\site-packages (from fiona) (2025.8.3)
+Requirement already satisfied: click~=8.0 in c:\users\admin\desktop\jobs\doris\satellite-driven crop health monitoring\venv\lib\site-packages (from fiona) (8.2.1)
+Requirement already satisfied: click-plugins>=1.0 in c:\users\admin\desktop\jobs\doris\satellite-driven crop health monitoring\venv\lib\site-packages (from fiona) (1.1.1.2)
+Requirement already satisfied: cligj>=0.5 in c:\users\admin\desktop\jobs\doris\satellite-driven crop health monitoring\venv\lib\site-packages (from fiona) (0.7.2)
+Requirement already satisfied: colorama in c:\users\admin\desktop\jobs\doris\satellite-driven crop health monitoring\venv\lib\site-packages (from click~=8.0->fiona) (0.4.6)
