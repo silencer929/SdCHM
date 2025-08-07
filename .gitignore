@@ -1,0 +1,23 @@
+.streamlit
+.vscode
+__*
+*.ipynb*
+raw*
+processed*
+curated*
+testing*
+*.cpg
+*.dbf
+*.prj
+*.shp
+*.shx
+*.zip
+# *.toml
+images_CLP
+images_FCOVER
+images_TRUECOLOR
+FGM International
+historic_avarages_cache
+shapefiles
+cache
+FGM
