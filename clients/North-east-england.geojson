@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Tees Lowlands - 100km2 AOI (center Darlington)"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-1.630996, 54.480984],
+          [-1.476204, 54.480984],
+          [-1.476204, 54.570816],
+          [-1.630996, 54.570816],
+          [-1.630996, 54.480984]
+        ]]
+      }
+    }
+  ]
+}

@@ -396,6 +396,7 @@ def app(metric):
                             # Display the plot
                             st.pyplot(fig)
 
+
                 # Add the historic averages to the cache
                 historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages'] = historic_avarages
                 historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates'] = historic_avarages_dates

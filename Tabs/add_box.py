@@ -24,8 +24,9 @@ def app():
      
     # Show the map to the user and let them draw on it
     m = folium.Map(location=[14.408939060626585, 33.25127862142054], zoom_start=10)
+    Draw(draw_options={"polyline": True}, edit_options={"edit": True}).add_to(m)
     utils.basemaps['Google Satellite'].add_to(m)
-    Draw(export=True).add_to(m)
+
 
     with st.expander('Show Map'):
         output = st_folium(m, width=700, height=500)
