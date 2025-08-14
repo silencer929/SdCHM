@@ -139,7 +139,7 @@ def get_curated_location_img_path(clientName, metric, date, field):
     else:
         return None
 
-def parse_app_config(path=r'config-fgm-dev.yaml'):
+def parse_app_config(path=r'config.yaml'):
     config = confuse.Configuration('CropHealth', __name__)
     config.set_file(path)
     return config

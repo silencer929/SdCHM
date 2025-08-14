@@ -5,8 +5,7 @@ from streamlit_folium import st_folium
 
 def app():
     # Welcome message and Intro
-    st.title("Crop Monitoring - Home")
-    st.header("Welcome to the Crop Health Dashboard")
+    st.title("Overview of the Farms")
     st.write("This dashboard is designed to help you monitor the health of your crops. Use the tabs above to navigate to the different sections of the dashboard.")
 
     # Get the app config 
@@ -29,7 +28,7 @@ def app():
         column="Crop_Type",
         tooltip=["Field_Id", "Crop_Type"],
         popup=True,
-        style_kwds=dict(color="black", fillOpacity=0.1))
+        style_kwds=dict(color="black", fillOpacity=0.1), location=[54.55, -1.51], zoom_start=13)
 
     # Add Google Satellite as a base map  
     google_map = utils.basemaps['Google Satellite']

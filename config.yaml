@@ -4,14 +4,14 @@ APP:
   Logo: app_logo.png
   Location: Sudan
 Client:
-  Name: FGM International
+  Name: North-East England Project
   Logo: fgm.png
   Location: Sudan
-  DataPath: ./clients/FGM.geojson
+  DataPath: ./clients/North-east-england.geojson
 Us:
-  Name: AmunData
+  Name: Project
   Logo: amundata_logo.png
-  Location: Sudan
+  Location: England
 Sentinel:
   InstanceId: 456e94d0-903b-4abd-83a5-0d63d3869500     
   ClientId: da441cb3-4cc8-4d59-ad27-d20c26a5dc13 
