@@ -16,6 +16,14 @@ from plotly.subplots import make_subplots
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
+
+@st.cache_data()
+def get_and_cache_available_dates(_df, field_id, year, start_date, end_date):
+    dates = main.get_available_dates_for_field(_df, field_id, year, start_date, end_date)
+    print(f'Caching Dates for {field_id}')
+    return dates
+
+
 def calculate_historic_averages(src_df, f_id, metric, client_name, years):
     historic_avarages_cache_dir = './historic_avarages_cache'
     historic_avarages_cache_path = f'{historic_avarages_cache_dir}/historic_avarages_cache.joblib'
