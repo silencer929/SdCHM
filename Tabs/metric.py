@@ -377,6 +377,84 @@ def app(metric):
             fig.update_yaxes(title_text='Cloud Cover', secondary_y=True)
             st.plotly_chart(fig)
 
+
+            from sklearn.metrics import mean_absolute_error, mean_squared_error
+            from datetime import datetime
+            import plotly.graph_objects as go
+
+            # --- XGBoost on Historic Averages ---
+            if historic_avarages and historic_avarages_dates:
+
+                # 1. Prepare dataframe
+                df = pd.DataFrame({
+                    "date": pd.to_datetime(historic_avarages_dates),
+                    "value": historic_avarages
+                })
+                df = df.sort_values("date").reset_index(drop=True)
+
+                # 2. Create lag features
+                def create_lag_features(data, lag=5):
+                    for i in range(1, lag + 1):
+                        data[f"lag_{i}"] = data["value"].shift(i)
+                    return data
+
+                df = create_lag_features(df, lag=5)
+                df.dropna(inplace=True)
+
+                # 3. Train-test split (time order)
+                train_size = int(len(df) * 0.8)
+                train, test = df.iloc[:train_size], df.iloc[train_size:]
+
+                X_train = train.drop(columns=["date", "value"])
+                y_train = train["value"]
+                X_test = test.drop(columns=["date", "value"])
+                y_test = test["value"]
+
+                # 4. Train XGBoost
+                model = xgb.XGBRegressor(
+                    objective="reg:squarederror",
+                    n_estimators=200,
+                    learning_rate=0.05,
+                    max_depth=4
+                )
+                model.fit(X_train, y_train)
+
+                # 5. Predict
+                y_pred = model.predict(X_test)
+
+                # 6. Evaluation metrics
+                mae = mean_absolute_error(y_test, y_pred)
+                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+
+                st.subheader("XGBoost Model Evaluation")
+                st.write(f"**MAE:** {mae:.4f}")
+                st.write(f"**RMSE:** {rmse:.4f}")
+
+                # 7. Plot with Plotly
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=test["date"], y=y_test,
+                    mode="lines+markers",
+                    name="Actual"
+                ))
+                fig.add_trace(go.Scatter(
+                    x=test["date"], y=y_pred,
+                    mode="lines+markers",
+                    name="Predicted"
+                ))
+
+                fig.update_layout(
+                    title="Historic Averages - Actual vs Predicted (XGBoost)",
+                    xaxis_title="Date",
+                    yaxis_title="Value",
+                    legend=dict(x=0, y=1, traceorder="normal")
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+            else:
+                st.warning("No historic averages available to train the model.")
+
     else:
         st.info('Please Select A Field')
 
