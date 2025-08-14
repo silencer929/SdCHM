@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from streamlit_folium import st_folium
 from plotly.subplots import make_subplots
+from concurrent.futures import ThreadPoolExecutor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
