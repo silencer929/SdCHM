@@ -3,7 +3,7 @@ import main
 import utils
 import joblib
 import numpy as np
-import modelling
+from . import modelling
 import pandas as pd
 import xgboost as xgb
 import streamlit as st
