@@ -123,7 +123,6 @@ def train_test_model(src_df, f_id, metric, client_name):
 
     # 1. TRAINING DATA: 2020–2023
     years_train = ['2020', '2021', '2022', '2023']
-
     calculate_historic_averages(src_df, f_id, metric, client_name, years_train)
 
     historic_dates_train = []
@@ -189,11 +188,38 @@ def train_test_model(src_df, f_id, metric, client_name):
     mae = mean_absolute_error(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 
+    # --- NEW: 95% Confidence Interval ---
+    residuals = y_test - y_pred
+    std_error = np.std(residuals)
+    ci_range = 1.96 * std_error
+    upper_ci = y_pred + ci_range
+    lower_ci = y_pred - ci_range
+
+    # Accuracy within CI
+    within_ci = ((y_test >= lower_ci) & (y_test <= upper_ci)).sum()
+    accuracy_ci = within_ci / len(y_test) * 100
+
+    # --- NEW: Health Classification from 10th percentile ---
+    threshold_10th = np.percentile(y_test, 10)
+
+    def classify_health(value, threshold):
+        if value >= threshold:
+            return "Healthy"
+        elif threshold * 0.7 <= value < threshold:
+            return "Warning"
+        else:
+            return "Alert"
+
+    health_status = [classify_health(v, threshold_10th) for v in y_test]
+
+    # 8. Streamlit Outputs
     st.subheader("XGBoost Model Evaluation")
     st.write(f"**MAE:** {mae:.4f}")
     st.write(f"**RMSE:** {rmse:.4f}")
+    st.write(f"**CI Accuracy (95%):** {accuracy_ci:.2f}%")
+    st.write(f"**10th Percentile Threshold:** {threshold_10th:.4f}")
 
-    # 8. Plot results
+    # 9. Plot with Plotly (CI shaded)
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df_test["date"], y=y_test,
@@ -205,14 +231,37 @@ def train_test_model(src_df, f_id, metric, client_name):
         mode="lines+markers",
         name="Predicted"
     ))
+    fig.add_trace(go.Scatter(
+        x=df_test["date"], y=upper_ci,
+        mode="lines",
+        line=dict(width=0),
+        showlegend=False
+    ))
+    fig.add_trace(go.Scatter(
+        x=df_test["date"], y=lower_ci,
+        mode="lines",
+        fill='tonexty',
+        fillcolor='rgba(255, 165, 0, 0.2)',
+        line=dict(width=0),
+        name="95% CI"
+    ))
 
     fig.update_layout(
-        title="Historic Averages Forecast (2024 Test Data)",
+        title="Historic Averages Forecast (2024 Test Data with 95% CI)",
         xaxis_title="Date",
         yaxis_title="Value"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
+    # 10. Show Health Status Table
+    health_df = pd.DataFrame({
+        "Date": df_test["date"],
+        "Actual": y_test,
+        "Predicted": y_pred,
+        "Health Status": health_status
+    })
+    st.write("### Crop Health Status (Based on 10th Percentile)")
+    st.dataframe(health_df)
 
 
