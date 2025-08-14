@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from streamlit_folium import st_folium
 from plotly.subplots import make_subplots
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 @st.cache_data()
 def get_and_cache_available_dates(_df, field_id, year, start_date, end_date):
@@ -104,8 +105,6 @@ def app(metric):
             years = [f'20{i}' for i in range(20, 24)]
             year = st.selectbox('Select Year: ', years, index=0, key=f'Select Year Dropdown Menu - {metric}')
 
-
-            from datetime import datetime
             # Set the min, max and default values for start and end dates
             min_val = f'{year}-01-01'
             max_val = f'{year}-12-31'
@@ -379,9 +378,6 @@ def app(metric):
             st.plotly_chart(fig)
 
 
-            from sklearn.metrics import mean_absolute_error, mean_squared_error
-            from datetime import datetime
-            import plotly.graph_objects as go
 
             # --- XGBoost on Historic Averages ---
             if historic_avarages and historic_avarages_dates:
