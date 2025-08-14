@@ -102,15 +102,16 @@ def app(metric):
         with st.expander('Select Year, Start Date and End Date'):
             # Get the year
             years = [f'20{i}' for i in range(20, 24)]
-            print(years)
             year = st.selectbox('Select Year: ', years, index=0, key=f'Select Year Dropdown Menu - {metric}')
-           
+
+
+            from datetime import datetime
             # Set the min, max and default values for start and end dates
             min_val = f'{year}-01-01'
             max_val = f'{year}-12-31'
             default_val = f'{year}-07-01'
-            min_val = datetime.strptime('2020-01-01', '%Y-%m-%d')
-            max_val = datetime.strptime('2023-12-31', '%Y-%m-%d')
+            min_val = datetime.strptime(min_val, '%Y-%m-%d')
+            max_val = datetime.strptime(max_val, '%Y-%m-%d')
             default_val = datetime.strptime(f'{year}-07-01', '%Y-%m-%d')
             # Get the start and end dates
             start_date = st.date_input('Start Date', value=default_val, min_value=min_val, max_value=max_val, key=f'Start Date - {metric}')
