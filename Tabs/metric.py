@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from streamlit_folium import st_folium
 from plotly.subplots import make_subplots
+from concurrent.futures import ThreadPoolExecutor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 @st.cache_data()
@@ -255,9 +256,14 @@ def app(metric):
 
     else:
         st.info('Please Select A Field and A Date')
-    
 
-    from concurrent.futures import ThreadPoolExecutor
+
+    # --- XGBoost model ---
+    if st.button("Run XGBoost Model"):
+     with st.spinner("Training model, please wait..."):
+        modelling.train_test_model(src_df, f_id, metric, client_name)
+    st.success("Model finished running!")
+
 
     st.markdown('---')
     st.header('Show Historic Averages')
@@ -381,11 +387,6 @@ def app(metric):
             fig.update_yaxes(title_text='Cloud Cover', secondary_y=True)
             st.plotly_chart(fig)
 
-            # --- XGBoost model ---
-            if st.button("Run XGBoost Model"):
-             with st.spinner("Training model, please wait..."):
-                modelling.train_test_model(src_df, f_id, metric, client_name)
-            st.success("Model finished running!")
 
     else:
         st.info('Please Select A Field')
