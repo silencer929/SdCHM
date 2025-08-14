@@ -383,7 +383,9 @@ def app(metric):
 
             # --- XGBoost model ---
             if st.button("Run XGBoost Model"):
+             with st.spinner("Training model, please wait..."):
                 modelling.train_test_model(src_df, f_id, metric, client_name)
+            st.success("Model finished running!")
 
     else:
         st.info('Please Select A Field')
