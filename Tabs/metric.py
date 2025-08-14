@@ -381,10 +381,9 @@ def app(metric):
             fig.update_yaxes(title_text='Cloud Cover', secondary_y=True)
             st.plotly_chart(fig)
 
-
-
             # --- XGBoost model ---
-            modelling.train_test_model(src_df,f_id, metric, client_name)
+            if st.button("Run XGBoost Model"):
+                modelling.train_test_model(src_df, f_id, metric, client_name)
 
     else:
         st.info('Please Select A Field')

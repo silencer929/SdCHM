@@ -115,7 +115,7 @@ def train_test_model(src_df, f_id, metric, client_name):
     # 1. TRAINING DATA: 2020–2023
     years_train = ['2020', '2021', '2022', '2023']
 
-    calculate_historic_averages(src_df, f_id, metric, client_name, years)
+    calculate_historic_averages(src_df, f_id, metric, client_name, years_train)
 
     historic_dates_train = []
     historic_values_train = []
@@ -135,6 +135,8 @@ def train_test_model(src_df, f_id, metric, client_name):
     year_test = '2024'
     historic_dates_test = []
     historic_values_test = []
+
+    calculate_historic_averages(src_df, f_id, metric, client_name, year_test)
 
     dates_2024 = get_and_cache_available_dates(src_df, f_id, year_test, f'{year_test}-01-01', f'{year_test}-12-31')
     dates_2024.sort()
