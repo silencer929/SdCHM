@@ -116,7 +116,7 @@ def app(metric):
             default_val = f'{year}-01-01'
             min_val = datetime.strptime(min_val, '%Y-%m-%d')
             max_val = datetime.strptime(max_val, '%Y-%m-%d')
-            default_val = datetime.strptime(f'{year}-07-01', '%Y-%m-%d')
+            default_val = datetime.strptime(default_val, '%Y-%m-%d')
             # Get the start and end dates
             start_date = st.date_input('Start Date', value=default_val, min_value=min_val, max_value=max_val, key=f'Start Date - {metric}')
             end_date = st.date_input('End Date', value=max_val, min_value=min_val, max_value=max_val, key=f'End Date - {metric}')
