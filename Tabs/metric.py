@@ -113,7 +113,7 @@ def app(metric):
             # Set the min, max and default values for start and end dates
             min_val = f'{year}-01-01'
             max_val = f'{year}-12-31'
-            default_val = f'{year}-07-01'
+            default_val = f'{year}-01-01'
             min_val = datetime.strptime(min_val, '%Y-%m-%d')
             max_val = datetime.strptime(max_val, '%Y-%m-%d')
             default_val = datetime.strptime(f'{year}-07-01', '%Y-%m-%d')
