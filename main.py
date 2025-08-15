@@ -24,7 +24,7 @@ def get_available_dates_for_field(df, field, year, start_date='', end_date=''):
         end_date = f'{year}-12-31'
 
     data = (
-        f'{{ "collections": [ "sentinel-2-l2a" ], '
+        f'{{ "collections": [ "sentinel-2-l1c" ], '
         f'"datetime": "{start_date}T00:00:00Z/{end_date}T23:59:59Z", '
         f'"bbox": {bbox}, "limit": 100, "distinct": "date" }}'
     )
