@@ -258,17 +258,11 @@ def app(metric):
         st.info('Please Select A Field and A Date')
 
 
-    # --- Model Selection ---
-    model_choice = st.selectbox(
-        "Choose a model to run:",
-        ["XGBoost", "Ridge", "Lasso", "ElasticNet"],
-        key=f"model_choice_{metric}"
-    )
-
-    if st.button(f"Run {model_choice} Model", key=f"run_model_{metric}"):
-        with st.spinner(f"Training {model_choice} model, please wait..."):
-            modelling.train_test_model(src_df, f_id, metric, client_name, model_type=model_choice.lower())
-        st.success(f"{model_choice} model finished running!")
+    # --- XGBoost model ---
+    if st.button("Run XGBoost Model", key=f"run_xgb_model_{metric}"):
+     with st.spinner("Training model, please wait..."):
+        modelling.train_test_model(src_df, f_id, metric, client_name)
+    st.success("Model finished running!")
 
 
     st.markdown('---')
@@ -277,34 +271,20 @@ def app(metric):
     # If a field is selected, display the historic averages
     if f_id != -1:
 
-        with st.expander('Select Years, Start Date and End Date'):
+        # Let the user select multiple years, start date and end date are set per year
+        with st.expander('Select Year(s) to Display'):
             years = [f'20{i}' for i in range(20, 24)]
             selected_years = st.multiselect(
-                'Select Years:',
+                'Select Year(s): ',
                 years,
-                default=years,  # Default selects all years
-                key=f'Select Years Dropdown Menu - {metric}- Historic Averages'
+                default=[years[0]],
+                key=f'Select Year(s) Dropdown Menu - {metric}- Historic Averages'
             )
 
-        # Get the dates for historic averages
-        historic_avarages_dates_for_field = get_and_cache_available_dates(src_df, f_id, year, start_date, end_date)
-        historic_avarages_dates_for_field = sorted(
-            [datetime.strptime(date, '%Y-%m-%d') for date in historic_avarages_dates_for_field]
-        )
-        historic_avarages_dates_for_field = [datetime.strftime(date, '%Y-%m-%d') for date in historic_avarages_dates_for_field]
-        num_historic_dates = len(historic_avarages_dates_for_field)
-
-        st.write(f' Found {num_historic_dates} dates for field {f_id} in {year} (from {start_date} to {end_date})')
-
-        # button to trigger plotting
-        display_historic_avgs_button = st.button(
-                f'Display Historic Averages for Field {field_name} (Field ID: {f_id}) across {len(selected_years)} years',
-                key=f'Display Historic Averages Button - {metric}',
-                use_container_width=True,
-                type='primary'
-            )
-
-        if display_historic_avgs_button:
+        if not selected_years:
+            st.info('Please select at least one year')
+        else:
+            # Pre-load or initialise caches once
             historic_avarages_cache_dir = './historic_avarages_cache'
             historic_avarages_cache_path = f'{historic_avarages_cache_dir}/historic_avarages_cache.joblib'
             historic_avarages_cache_clp_path = f'{historic_avarages_cache_dir}/historic_avarages_cache_clp.joblib'
@@ -324,81 +304,119 @@ def app(metric):
                 historic_avarages_cache_clp = {}
 
             client_name = CONFIG['Client']['Name'].get()
-            found_in_cache = False
-            if client_name not in historic_avarages_cache:
-                historic_avarages_cache[client_name] = {}
-            if metric not in historic_avarages_cache[client_name]:
-                historic_avarages_cache[client_name][metric] = {}
-            if f_id not in historic_avarages_cache[client_name][metric]:
-                historic_avarages_cache[client_name][metric][f_id] = {}
-            if year not in historic_avarages_cache[client_name][metric][f_id]:
-                historic_avarages_cache[client_name][metric][f_id][year] = {}
-            if len(historic_avarages_cache[client_name][metric][f_id][year]) > 0:
-                found_in_cache = True
 
-            found_in_cache_clp = False
-            if client_name not in historic_avarages_cache_clp:
-                historic_avarages_cache_clp[client_name] = {}
-            if 'CLP' not in historic_avarages_cache_clp[client_name]:
-                historic_avarages_cache_clp[client_name]['CLP'] = {}
-            if f_id not in historic_avarages_cache_clp[client_name]['CLP']:
-                historic_avarages_cache_clp[client_name]['CLP'][f_id] = {}
-            if year not in historic_avarages_cache_clp[client_name]['CLP'][f_id]:
-                historic_avarages_cache_clp[client_name]['CLP'][f_id][year] = {}
-            if len(historic_avarages_cache_clp[client_name]['CLP'][f_id][year]) > 0:
-                found_in_cache_clp = True
+            display_historic_avgs_button = st.button(
+                f'Display Historic Averages for Field {field_name} (Field ID: {f_id}) for Selected Year(s)',
+                key=f'Display Historic Averages Button - {metric}',
+                help='Click to display the historic averages for the selected field and year(s)',
+                use_container_width=True, type='primary'
+            )
 
-            if found_in_cache and found_in_cache_clp:
-                st.info('Found Historic Averages in Cache')
-                historic_avarages = historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages']
-                historic_avarages_dates = historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates']
-                historic_avarages_clp = historic_avarages_cache_clp[client_name]['CLP'][f_id][year]['historic_avarages_clp']
-            else:
-                st.info('Calculating Historic Averages...')
+            if display_historic_avgs_button:
+                st.info('Processing selected year(s)...')
 
-                historic_avarages = []
-                historic_avarages_dates = []
-                historic_avarages_clp = []
+                # Ensure top-level cache structure exists for client/metric
+                if client_name not in historic_avarages_cache:
+                    historic_avarages_cache[client_name] = {}
+                if metric not in historic_avarages_cache[client_name]:
+                    historic_avarages_cache[client_name][metric] = {}
 
-                def fetch_data_for_date(current_date):
-                    current_df = main.get_cuarted_df_for_field(src_df, f_id, current_date, metric, client_name)
-                    current_df_clp = main.get_cuarted_df_for_field(src_df, f_id, current_date, 'CLP', client_name)
-                    current_avg = current_df[f'{metric}_{current_date}'].mean()
-                    current_avg_clp = current_df_clp[f'CLP_{current_date}'].mean()
-                    return current_date, current_avg, current_avg_clp
+                if client_name not in historic_avarages_cache_clp:
+                    historic_avarages_cache_clp[client_name] = {}
+                if 'CLP' not in historic_avarages_cache_clp[client_name]:
+                    historic_avarages_cache_clp[client_name]['CLP'] = {}
 
-                dates_for_field_bar = st.progress(0)
-                with st.spinner('Calculating Historic Averages...'):
-                    with ThreadPoolExecutor(max_workers=5) as executor:
-                        results = list(executor.map(fetch_data_for_date, historic_avarages_dates_for_field))
-                    for i, (date, avg, avg_clp) in enumerate(results):
-                        historic_avarages.append(avg)
-                        historic_avarages_dates.append(date)
-                        historic_avarages_clp.append(avg_clp)
-                        dates_for_field_bar.progress((i + 1) / num_historic_dates)
+                # Process each selected year independently and display a plot for each
+                for year in selected_years:
+                    start_date = f'{year}-01-01'
+                    end_date = f'{year}-12-31'
 
-                historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages'] = historic_avarages
-                historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates'] = historic_avarages_dates
-                historic_avarages_cache_clp[client_name]['CLP'][f_id][year]['historic_avarages_clp'] = historic_avarages_clp
+                    # Get the dates for historic averages for this year
+                    historic_avarages_dates_for_field = get_and_cache_available_dates(src_df, f_id, year, start_date, end_date)
+                    historic_avarages_dates_for_field = sorted(
+                        [datetime.strptime(date, '%Y-%m-%d') for date in historic_avarages_dates_for_field]
+                    )
+                    historic_avarages_dates_for_field = [datetime.strftime(date, '%Y-%m-%d') for date in historic_avarages_dates_for_field]
+                    num_historic_dates = len(historic_avarages_dates_for_field)
 
-                joblib.dump(historic_avarages_cache, historic_avarages_cache_path)
-                joblib.dump(historic_avarages_cache_clp, historic_avarages_cache_clp_path)
-                st.info('Historic Averages Saved in Cache')
-                st.write(f'Cache Path: {historic_avarages_cache_path}')
-                st.write(f'Cache CLP Path: {historic_avarages_cache_clp_path}')
+                    st.write(f'Found {num_historic_dates} dates for field {f_id} in {year} (from {start_date} to {end_date})')
 
-            fig = make_subplots(specs=[[{"secondary_y": True}]])
-            fig.add_trace(go.Scatter(x=historic_avarages_dates, y=historic_avarages, name=f'{metric} Historic Averages'), secondary_y=False)
-            fig.add_trace(go.Scatter(x=historic_avarages_dates, y=historic_avarages_clp, name='Cloud Cover'), secondary_y=True)
-            fig.update_layout(title_text=f'{metric} Historic Averages for {field_name} (Field ID: {f_id}) in {year}')
-            fig.update_xaxes(title_text='Date')
-            fig.update_yaxes(title_text=f'{metric} Historic Averages', secondary_y=False)
-            fig.update_yaxes(title_text='Cloud Cover', secondary_y=True)
-            st.plotly_chart(fig)
+                    # Prepare per-year entries in caches
+                    if f_id not in historic_avarages_cache[client_name][metric]:
+                        historic_avarages_cache[client_name][metric][f_id] = {}
+                    if year not in historic_avarages_cache[client_name][metric][f_id]:
+                        historic_avarages_cache[client_name][metric][f_id][year] = {}
 
+                    if f_id not in historic_avarages_cache_clp[client_name]['CLP']:
+                        historic_avarages_cache_clp[client_name]['CLP'][f_id] = {}
+                    if year not in historic_avarages_cache_clp[client_name]['CLP'][f_id]:
+                        historic_avarages_cache_clp[client_name]['CLP'][f_id][year] = {}
+
+                    found_in_cache = len(historic_avarages_cache[client_name][metric][f_id][year]) > 0
+                    found_in_cache_clp = len(historic_avarages_cache_clp[client_name]['CLP'][f_id][year]) > 0
+
+                    if found_in_cache and found_in_cache_clp:
+                        st.info(f'Found Historic Averages in Cache for {year}')
+                        historic_avarages = historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages']
+                        historic_avarages_dates = historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates']
+                        historic_avarages_clp = historic_avarages_cache_clp[client_name]['CLP'][f_id][year]['historic_avarages_clp']
+                    else:
+                        st.info(f'Calculating Historic Averages for {year}...')
+
+                        historic_avarages = []
+                        historic_avarages_dates = []
+                        historic_avarages_clp = []
+
+                        def fetch_data_for_date(current_date):
+                            current_df = main.get_cuarted_df_for_field(src_df, f_id, current_date, metric, client_name)
+                            current_df_clp = main.get_cuarted_df_for_field(src_df, f_id, current_date, 'CLP', client_name)
+                            current_avg = current_df[f'{metric}_{current_date}'].mean()
+                            current_avg_clp = current_df_clp[f'CLP_{current_date}'].mean()
+                            return current_date, current_avg, current_avg_clp
+
+                        dates_for_field_bar = st.progress(0)
+                        with st.spinner(f'Calculating Historic Averages for {year}...'):
+                            with ThreadPoolExecutor(max_workers=5) as executor:
+                                results = list(executor.map(fetch_data_for_date, historic_avarages_dates_for_field))
+                            for i, (date, avg, avg_clp) in enumerate(results):
+                                historic_avarages.append(avg)
+                                historic_avarages_dates.append(date)
+                                historic_avarages_clp.append(avg_clp)
+                                # Protect division by zero if no dates
+                                if num_historic_dates > 0:
+                                    dates_for_field_bar.progress((i + 1) / num_historic_dates)
+
+                        # Store computed results into caches for this year
+                        historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages'] = historic_avarages
+                        historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates'] = historic_avarages_dates
+                        historic_avarages_cache_clp[client_name]['CLP'][f_id][year]['historic_avarages_clp'] = historic_avarages_clp
+
+                        # Persist caches after computing each year's data
+                        joblib.dump(historic_avarages_cache, historic_avarages_cache_path)
+                        joblib.dump(historic_avarages_cache_clp, historic_avarages_cache_clp_path)
+                        st.info(f'Historic Averages for {year} saved in cache')
+                        st.write(f'Cache Path: {historic_avarages_cache_path}')
+                        st.write(f'Cache CLP Path: {historic_avarages_cache_clp_path}')
+
+                    # Build and display a separate plot for this year
+                    fig = make_subplots(specs=[[{"secondary_y": True}]])
+                    fig.add_trace(
+                        go.Scatter(x=historic_avarages_dates, y=historic_avarages, name=f'{metric} Historic Averages ({year})'),
+                        secondary_y=False
+                    )
+                    fig.add_trace(
+                        go.Scatter(x=historic_avarages_dates, y=historic_avarages_clp, name=f'Cloud Cover ({year})'),
+                        secondary_y=True
+                    )
+                    fig.update_layout(title_text=f'{metric} Historic Averages for {field_name} (Field ID: {f_id}) in {year}')
+                    fig.update_xaxes(title_text='Date')
+                    fig.update_yaxes(title_text=f'{metric} Historic Averages', secondary_y=False)
+                    fig.update_yaxes(title_text='Cloud Cover', secondary_y=True)
+                    st.plotly_chart(fig)
 
     else:
         st.info('Please Select A Field')
+
 
         
         
