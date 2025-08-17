@@ -119,7 +119,9 @@ def calculate_historic_averages(src_df, f_id, metric, client_name, years):
 
 
 
-def train_test_model(src_df, f_id, metric, client_name):
+def train_test_model(src_df, f_id, metric, client_name, model_type="xgboost"):
+    from sklearn.linear_model import Ridge, Lasso, ElasticNet
+    import xgboost as xgb
 
     # 1. TRAINING DATA: 2020–2023
     years_train = ['2020', '2021', '2022', '2023']
@@ -172,13 +174,21 @@ def train_test_model(src_df, f_id, metric, client_name):
     X_test = df_test.drop(columns=["date", "value"])
     y_test = df_test["value"]
 
-    # 5. Train XGBoost
-    model = xgb.XGBRegressor(
-        objective="reg:squarederror",
-        n_estimators=200,
-        learning_rate=0.05,
-        max_depth=4
-    )
+    # 5. Choose Model
+    if model_type == "ridge":
+        model = Ridge(alpha=1.0)
+    elif model_type == "lasso":
+        model = Lasso(alpha=0.01)
+    elif model_type == "elasticnet":
+        model = ElasticNet(alpha=0.01, l1_ratio=0.5)
+    else:  # default xgboost
+        model = xgb.XGBRegressor(
+            objective="reg:squarederror",
+            n_estimators=200,
+            learning_rate=0.05,
+            max_depth=4
+        )
+
     model.fit(X_train, y_train)
 
     # 6. Predict
@@ -188,18 +198,15 @@ def train_test_model(src_df, f_id, metric, client_name):
     mae = mean_absolute_error(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 
-    # --- NEW: 95% Confidence Interval ---
     residuals = y_test - y_pred
     std_error = np.std(residuals)
     ci_range = 1.96 * std_error
     upper_ci = y_pred + ci_range
     lower_ci = y_pred - ci_range
 
-    # Accuracy within CI
     within_ci = ((y_test >= lower_ci) & (y_test <= upper_ci)).sum()
     accuracy_ci = within_ci / len(y_test) * 100
 
-    # --- NEW: Health Classification from 10th percentile ---
     threshold_10th = np.percentile(y_test, 10)
 
     def classify_health(value, threshold):
@@ -213,30 +220,17 @@ def train_test_model(src_df, f_id, metric, client_name):
     health_status = [classify_health(v, threshold_10th) for v in y_test]
 
     # 8. Streamlit Outputs
-    st.subheader("XGBoost Model Evaluation")
+    st.subheader(f"{model_type.upper()} Model Evaluation")
     st.write(f"**MAE:** {mae:.4f}")
     st.write(f"**RMSE:** {rmse:.4f}")
     st.write(f"**CI Accuracy (95%):** {accuracy_ci:.2f}%")
     st.write(f"**10th Percentile Threshold:** {threshold_10th:.4f}")
 
-    # 9. Plot with Plotly (CI shaded)
+    # 9. Plot with Plotly
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df_test["date"], y=y_test,
-        mode="lines+markers",
-        name="Actual"
-    ))
-    fig.add_trace(go.Scatter(
-        x=df_test["date"], y=y_pred,
-        mode="lines+markers",
-        name="Predicted"
-    ))
-    fig.add_trace(go.Scatter(
-        x=df_test["date"], y=upper_ci,
-        mode="lines",
-        line=dict(width=0),
-        showlegend=False
-    ))
+    fig.add_trace(go.Scatter(x=df_test["date"], y=y_test, mode="lines+markers", name="Actual"))
+    fig.add_trace(go.Scatter(x=df_test["date"], y=y_pred, mode="lines+markers", name="Predicted"))
+    fig.add_trace(go.Scatter(x=df_test["date"], y=upper_ci, mode="lines", line=dict(width=0), showlegend=False))
     fig.add_trace(go.Scatter(
         x=df_test["date"], y=lower_ci,
         mode="lines",
@@ -245,13 +239,8 @@ def train_test_model(src_df, f_id, metric, client_name):
         line=dict(width=0),
         name="95% CI"
     ))
-
-    fig.update_layout(
-        title="Historic Averages Forecast (2024 Test Data with 95% CI)",
-        xaxis_title="Date",
-        yaxis_title="Value"
-    )
-
+    fig.update_layout(title=f"Historic Averages Forecast ({year_test} Test Data with 95% CI)",
+                      xaxis_title="Date", yaxis_title="Value")
     st.plotly_chart(fig, use_container_width=True)
 
     # 10. Show Health Status Table
@@ -263,5 +252,3 @@ def train_test_model(src_df, f_id, metric, client_name):
     })
     st.write("### Crop Health Status (Based on 10th Percentile)")
     st.dataframe(health_df)
-
-

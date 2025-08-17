@@ -258,11 +258,17 @@ def app(metric):
         st.info('Please Select A Field and A Date')
 
 
-    # --- XGBoost model ---
-    if st.button("Run XGBoost Model", key=f"run_xgb_model_{metric}"):
-     with st.spinner("Training model, please wait..."):
-        modelling.train_test_model(src_df, f_id, metric, client_name)
-    st.success("Model finished running!")
+    # --- Model Selection ---
+    model_choice = st.selectbox(
+        "Choose a model to run:",
+        ["XGBoost", "Ridge", "Lasso", "ElasticNet"],
+        key=f"model_choice_{metric}"
+    )
+
+    if st.button(f"Run {model_choice} Model", key=f"run_model_{metric}"):
+        with st.spinner(f"Training {model_choice} model, please wait..."):
+            modelling.train_test_model(src_df, f_id, metric, client_name, model_type=model_choice.lower())
+        st.success(f"{model_choice} model finished running!")
 
 
     st.markdown('---')
@@ -271,12 +277,14 @@ def app(metric):
     # If a field is selected, display the historic averages
     if f_id != -1:
 
-        # Let the user select the year, start date and end date
-        with st.expander('Select Year, Start Date and End Date'):
+        with st.expander('Select Years, Start Date and End Date'):
             years = [f'20{i}' for i in range(20, 24)]
-            year = st.selectbox('Select Year: ', years, index=0, key=f'Select Year Dropdown Menu - {metric}- Historic Averages')
-            start_date = f'{year}-01-01'
-            end_date = f'{year}-12-31'
+            selected_years = st.multiselect(
+                'Select Years:',
+                years,
+                default=years,  # Default selects all years
+                key=f'Select Years Dropdown Menu - {metric}- Historic Averages'
+            )
 
         # Get the dates for historic averages
         historic_avarages_dates_for_field = get_and_cache_available_dates(src_df, f_id, year, start_date, end_date)
@@ -288,12 +296,13 @@ def app(metric):
 
         st.write(f' Found {num_historic_dates} dates for field {f_id} in {year} (from {start_date} to {end_date})')
 
+        # button to trigger plotting
         display_historic_avgs_button = st.button(
-            f'Display Historic Averages for Field {field_name} (Field ID: {f_id}) in {year} (from {start_date} to {end_date})',
-            key=f'Display Historic Averages Button - {metric}',
-            help='Click to display the historic averages for the selected field',
-            use_container_width=True, type='primary'
-        )
+                f'Display Historic Averages for Field {field_name} (Field ID: {f_id}) across {len(selected_years)} years',
+                key=f'Display Historic Averages Button - {metric}',
+                use_container_width=True,
+                type='primary'
+            )
 
         if display_historic_avgs_button:
             historic_avarages_cache_dir = './historic_avarages_cache'
