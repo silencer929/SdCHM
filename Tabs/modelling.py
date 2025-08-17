@@ -141,11 +141,11 @@ def train_test_model(src_df, f_id, metric, client_name, model_type="xgboost"):
             historic_values_train.append(avg_val)
 
     # 2. TEST DATA: 2024
-    year_test = ['2024']
+    year_test = '2024'
     historic_dates_test = []
     historic_values_test = []
 
-    calculate_historic_averages(src_df, f_id, metric, client_name, year_test)
+    calculate_historic_averages(src_df, f_id, metric, client_name, ["2024"])
 
     dates_2024 = get_and_cache_available_dates(src_df, f_id, year_test, f'{year_test}-01-01', f'{year_test}-12-31')
     dates_2024.sort()
@@ -158,9 +158,6 @@ def train_test_model(src_df, f_id, metric, client_name, model_type="xgboost"):
     # 3. Create DataFrames
     df_train = pd.DataFrame({'date': pd.to_datetime(historic_dates_train), 'value': historic_values_train})
     df_test = pd.DataFrame({'date': pd.to_datetime(historic_dates_test), 'value': historic_values_test})
-    st.dataframe(df_train)
-    st.write(f"Train size: {df}, Test size: {df_test.shape}")
-
     # 4. Create lag features
     def create_lag_features(data, lag=5):
         for i in range(1, lag + 1):
