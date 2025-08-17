@@ -151,6 +151,120 @@ def app(metric):
     else:
         st.info('Please Select A Field')
 
+    st.markdown('---')
+    st.header('Show Field Data')
+
+    # If a field and a date are selected, display the field data
+    if (date != -1) and (f_id != -1):   
+
+        # Get the field data at the selected date
+        with st.spinner('Loading Field Data...'):
+            # Get the metric data and cloud cover data for the selected field and date
+            metric_data = main.get_cuarted_df_for_field(src_df, f_id, date, metric, client_name)
+            cloud_cover_data = main.get_cuarted_df_for_field(src_df, f_id, date, 'CLP', client_name)
+            
+            #Merge the metric and cloud cover data on the geometry column
+            field_data = metric_data.merge(cloud_cover_data, on='geometry')
+
+        # Display the field data
+        st.write(f'Field Data for {field_name} (Field ID: {f_id}) on {date}')
+        st.write(field_data.head(2))
+
+        #Get Avarage Cloud Cover
+        avg_clp = field_data[f'CLP_{date}'].mean() *100
+
+        # If the avarage cloud cover is greater than 80%, display a warning message
+        if avg_clp > 80:
+            st.warning(f'⚠️ The Avarage Cloud Cover is {avg_clp}%')
+            st.info('Please Select A Different Date')
+
+        ## Generate the field data Map ##
+
+        #Title, Colormap and Legend
+
+        title = f'{metric} for selected field {field_name} (Field ID: {f_id}) in {date}'
+
+        cmap_map = {
+        "NDVI": "Greens",
+        "NDWI": "Blues",
+        "EVI": "PuBu",
+        }
+
+
+        cmap = cmap_map.get(metric, "RdYlGn")
+
+        # Create a map of the field data
+        metric_data_map  = metric_data.explore(
+            column=f'{metric}_{date}',
+            cmap=cmap,
+            legend=True,
+            vmin=0,
+            vmax=1,
+            marker_type='circle', marker_kwds={'radius':5.3, 'fill':True})
+        
+        # Add Google Satellite as a base map
+        google_map = utils.basemaps['Google Satellite']
+        google_map.add_to(metric_data_map)
+
+        # Display the map
+        st_folium(metric_data_map, width = 725, key=f'Field Data Map - {metric}')
+
+
+        #Dwonload Links
+
+        # If the field data is not empty, display the download links
+        if len(field_data) > 0:
+            # Create two columns for the download links
+            download_as_shp_col, download_as_tiff_col = st.columns(2)
+
+            # Create a shapefile of the field data and add a download link
+            with download_as_shp_col:
+
+                #Set the shapefile name and path based on the field id, metric and date
+                extension = 'shp'
+                shapefilename = f"{f_id}_{metric}_{date}.{extension}"
+                path = f'./shapefiles/{f_id}/{metric}/{extension}'
+
+                # Create the target directory if it doesn't exist
+                os.makedirs(path, exist_ok=True)
+                
+                # Save the field data as a shapefile
+                field_data.to_file(f'{path}/{shapefilename}')
+
+                # Create a zip file of the shapefile
+                files = []
+                for i in os.listdir(path):
+                    if os.path.isfile(os.path.join(path,i)):
+                        if i[0:len(shapefilename)] == shapefilename:
+                            files.append(os.path.join(path,i))
+                zipFileName = f'{path}/{f_id}_{metric}_{date}.zip'
+                zipObj = ZipFile(zipFileName, 'w')
+                for file in files:
+                    zipObj.write(file)
+                zipObj.close()
+
+                # Add a download link for the zip file
+                with open(zipFileName, 'rb') as f:
+                    st.download_button('Download as ShapeFile', f,file_name=zipFileName)
+
+            # Get the tiff file path and create a download link
+            with download_as_tiff_col:
+                #get the tiff file path
+                tiff_path = utils.get_masked_location_img_path(client_name, metric, date, f_id)
+                # Add a download link for the tiff file
+                donwnload_filename = f'{metric}_{f_id}_{date}.tiff'
+                with open(tiff_path, 'rb') as f:
+                    st.download_button('Download as Tiff File', f,file_name=donwnload_filename)
+
+    else:
+        st.info('Please Select A Field and A Date')
+
+
+    # --- XGBoost model ---
+    if st.button("Run XGBoost Model", key=f"run_xgb_model_{metric}"):
+     with st.spinner("Training model, please wait..."):
+        modelling.train_test_model(src_df, f_id, metric, client_name)
+    st.success("Model finished running!")
 
     st.markdown('---')
     st.header('Show Historic Averages')
@@ -277,7 +391,6 @@ def app(metric):
 
     else:
         st.info('Please Select A Field')
-
 
 
         
