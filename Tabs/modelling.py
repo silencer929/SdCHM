@@ -93,7 +93,7 @@ def calculate_historic_averages(src_df, f_id, metric, client_name, years):
 
         progress_bar = st.progress(0)
         with st.spinner(f"Calculating Historic Averages for {year}..."):
-            with ThreadPoolExecutor(max_workers=30) as executor:
+            with ThreadPoolExecutor(max_workers=100) as executor:
                 results = list(executor.map(fetch_data_for_date, historic_dates_for_year))
             for i, (date, avg, avg_clp) in enumerate(results):
                 historic_values.append(avg)
