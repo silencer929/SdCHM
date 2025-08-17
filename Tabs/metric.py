@@ -367,21 +367,28 @@ def app(metric):
                         historic_avarages_dates = []
                         historic_avarages_clp = []
 
-                        def fetch_data_for_date(current_date):
-                            current_df = main.get_cuarted_df_for_field(src_df, f_id, current_date, metric, client_name)
-                            current_df_clp = main.get_cuarted_df_for_field(src_df, f_id, current_date, 'CLP', client_name)
-                            current_avg = current_df[f'{metric}_{current_date}'].mean()
-                            current_avg_clp = current_df_clp[f'CLP_{current_date}'].mean()
-                            return current_date, current_avg, current_avg_clp
-
                         dates_for_field_bar = st.progress(0)
                         with st.spinner(f'Calculating Historic Averages for {year}...'):
-                            with ThreadPoolExecutor(max_workers=5) as executor:
-                                results = list(executor.map(fetch_data_for_date, historic_avarages_dates_for_field))
-                            for i, (date, avg, avg_clp) in enumerate(results):
-                                historic_avarages.append(avg)
-                                historic_avarages_dates.append(date)
-                                historic_avarages_clp.append(avg_clp)
+                            # Sequential processing to avoid Fiona/GDAL concurrency issues
+                            for i, current_date in enumerate(historic_avarages_dates_for_field):
+                                try:
+                                    current_df = main.get_cuarted_df_for_field(src_df, f_id, current_date, metric, client_name)
+                                    current_avg = current_df[f'{metric}_{current_date}'].mean()
+                                except Exception as e:
+                                    st.warning(f'Failed to read metric for {current_date}: {e}')
+                                    current_avg = float('nan')
+
+                                try:
+                                    current_df_clp = main.get_cuarted_df_for_field(src_df, f_id, current_date, 'CLP', client_name)
+                                    current_avg_clp = current_df_clp[f'CLP_{current_date}'].mean()
+                                except Exception as e:
+                                    st.warning(f'Failed to read CLP for {current_date}: {e}')
+                                    current_avg_clp = float('nan')
+
+                                historic_avarages.append(current_avg)
+                                historic_avarages_dates.append(current_date)
+                                historic_avarages_clp.append(current_avg_clp)
+
                                 # Protect division by zero if no dates
                                 if num_historic_dates > 0:
                                     dates_for_field_bar.progress((i + 1) / num_historic_dates)
