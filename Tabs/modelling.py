@@ -158,6 +158,7 @@ def train_test_model(src_df, f_id, metric, client_name, model_type="xgboost"):
     # 3. Create DataFrames
     df_train = pd.DataFrame({'date': pd.to_datetime(historic_dates_train), 'value': historic_values_train})
     df_test = pd.DataFrame({'date': pd.to_datetime(historic_dates_test), 'value': historic_values_test})
+    st.write(f"Train size: {df_train.shape}, Test size: {df_test.shape}")
 
     # 4. Create lag features
     def create_lag_features(data, lag=5):
@@ -168,7 +169,6 @@ def train_test_model(src_df, f_id, metric, client_name, model_type="xgboost"):
     df_train = create_lag_features(df_train, lag=5).dropna()
     df_test = create_lag_features(df_test, lag=5).dropna()
 
-    st.write(f"Train size: {df_train.shape}, Test size: {df_test.shape}")
 
     X_train = df_train.drop(columns=["date", "value"])
     y_train = df_train["value"]
