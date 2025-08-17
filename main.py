@@ -50,18 +50,23 @@ def get_available_dates_for_field(df, field, year, start_date='', end_date=''):
         print(json_data)
         return []
 
-
 def get_cuarted_df_for_field(df, field, date, metric, clientName):
-    curated_date_path =  utils.get_curated_location_img_path(clientName, metric, date, field)
-    if curated_date_path is not None:
-        curated_df = gpd.read_file(curated_date_path)
-    else:
+    curated_date_path = utils.get_curated_location_img_path(clientName, metric, date, field)
+
+    if curated_date_path is None or not os.path.exists(curated_date_path):
         process.Download_image_in_given_date(clientName, metric, df, field, date)
         process.mask_downladed_image(clientName, metric, df, field, date)
         process.convert_maske_image_to_geodataframe(clientName, metric, df, field, date, df.crs)
-        curated_date_path =  utils.get_curated_location_img_path(clientName, metric, date, field)
+        curated_date_path = utils.get_curated_location_img_path(clientName, metric, date, field)
+
+    if curated_date_path is None or not os.path.exists(curated_date_path):
+        raise FileNotFoundError(f"Curated path not found after processing for {date}: {curated_date_path}")
+
+    try:
         curated_df = gpd.read_file(curated_date_path)
-    return curated_df
+    except Exception as e:
+        raise ValueError(f"Failed to read curated file {curated_date_path}: {e}")
+
 
 def get_True_color_data(df, field, date, clientName):
     metric = 'TRUECOLOR'
