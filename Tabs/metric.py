@@ -284,7 +284,7 @@ def app(metric):
         if not selected_years:
             st.info('Please select at least one year')
         else:
-            # Pre-load or initialise caches once
+            # Prepare caches once and locks to avoid race conditions
             historic_avarages_cache_dir = './historic_avarages_cache'
             historic_avarages_cache_path = f'{historic_avarages_cache_dir}/historic_avarages_cache.joblib'
             historic_avarages_cache_clp_path = f'{historic_avarages_cache_dir}/historic_avarages_cache_clp.joblib'
@@ -326,103 +326,179 @@ def app(metric):
                 if 'CLP' not in historic_avarages_cache_clp[client_name]:
                     historic_avarages_cache_clp[client_name]['CLP'] = {}
 
-                # Process each selected year independently and display a plot for each
+                # Locks to serialize file I/O and cache writes so Fiona and GDAL are not invoked concurrently
+                fiona_lock = threading.Lock()
+                cache_lock = threading.Lock()
+
+                # Shared state for progress and results
+                progress_state = {year: 0.0 for year in selected_years}
+                status_state = {year: 'Queued' for year in selected_years}
+                result_state = {}  # will hold tuples: (historic_avarages, historic_avarages_dates, historic_avarages_clp, num_dates)
+
+                # Create UI progress bars and status placeholders for each year
+                progress_bars = {}
+                status_placeholders = {}
                 for year in selected_years:
+                    status_placeholders[year] = st.empty()
+                    progress_bars[year] = st.progress(0.0)
+                    status_placeholders[year].info(f'{year}: queued')
+
+                # Worker function: each worker processes exactly one year sequentially over dates
+                def process_year(year):
+                    progress_state[year] = 0.0
+                    status_state[year] = 'Initializing'
                     start_date = f'{year}-01-01'
                     end_date = f'{year}-12-31'
 
-                    # Get the dates for historic averages for this year
-                    historic_avarages_dates_for_field = get_and_cache_available_dates(src_df, f_id, year, start_date, end_date)
-                    historic_avarages_dates_for_field = sorted(
-                        [datetime.strptime(date, '%Y-%m-%d') for date in historic_avarages_dates_for_field]
-                    )
-                    historic_avarages_dates_for_field = [datetime.strftime(date, '%Y-%m-%d') for date in historic_avarages_dates_for_field]
-                    num_historic_dates = len(historic_avarages_dates_for_field)
+                    # Get available dates for this year
+                    try:
+                        dates_for_year = get_and_cache_available_dates(src_df, f_id, year, start_date, end_date)
+                        dates_for_year = sorted([datetime.strptime(d, '%Y-%m-%d') for d in dates_for_year])
+                        dates_for_year = [datetime.strftime(d, '%Y-%m-%d') for d in dates_for_year]
+                    except Exception as e:
+                        # If date gathering fails, return empty results and mark failed
+                        status_state[year] = f'Failed to list dates: {e}'
+                        progress_state[year] = 1.0
+                        result_state[year] = ([], [], [], 0)
+                        return
 
-                    st.write(f'Found {num_historic_dates} dates for field {f_id} in {year} (from {start_date} to {end_date})')
+                    num_dates = len(dates_for_year)
+                    if num_dates == 0:
+                        status_state[year] = 'No dates found'
+                        progress_state[year] = 1.0
+                        result_state[year] = ([], [], [], 0)
+                        return
 
-                    # Prepare per-year entries in caches
-                    if f_id not in historic_avarages_cache[client_name][metric]:
-                        historic_avarages_cache[client_name][metric][f_id] = {}
-                    if year not in historic_avarages_cache[client_name][metric][f_id]:
-                        historic_avarages_cache[client_name][metric][f_id][year] = {}
+                    # Ensure cache entries for this year exist
+                    with cache_lock:
+                        if f_id not in historic_avarages_cache[client_name][metric]:
+                            historic_avarages_cache[client_name][metric][f_id] = {}
+                        if year not in historic_avarages_cache[client_name][metric][f_id]:
+                            historic_avarages_cache[client_name][metric][f_id][year] = {}
 
-                    if f_id not in historic_avarages_cache_clp[client_name]['CLP']:
-                        historic_avarages_cache_clp[client_name]['CLP'][f_id] = {}
-                    if year not in historic_avarages_cache_clp[client_name]['CLP'][f_id]:
-                        historic_avarages_cache_clp[client_name]['CLP'][f_id][year] = {}
+                        if f_id not in historic_avarages_cache_clp[client_name]['CLP']:
+                            historic_avarages_cache_clp[client_name]['CLP'][f_id] = {}
+                        if year not in historic_avarages_cache_clp[client_name]['CLP'][f_id]:
+                            historic_avarages_cache_clp[client_name]['CLP'][f_id][year] = {}
 
-                    found_in_cache = len(historic_avarages_cache[client_name][metric][f_id][year]) > 0
-                    found_in_cache_clp = len(historic_avarages_cache_clp[client_name]['CLP'][f_id][year]) > 0
+                        found_cache = len(historic_avarages_cache[client_name][metric][f_id][year]) > 0
+                        found_cache_clp = len(historic_avarages_cache_clp[client_name]['CLP'][f_id][year]) > 0
 
-                    if found_in_cache and found_in_cache_clp:
-                        st.info(f'Found Historic Averages in Cache for {year}')
-                        historic_avarages = historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages']
-                        historic_avarages_dates = historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates']
-                        historic_avarages_clp = historic_avarages_cache_clp[client_name]['CLP'][f_id][year]['historic_avarages_clp']
-                    else:
-                        st.info(f'Calculating Historic Averages for {year}...')
+                        if found_cache and found_cache_clp:
+                            status_state[year] = 'Loaded from cache'
+                            progress_state[year] = 1.0
+                            result_state[year] = (
+                                historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages'],
+                                historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates'],
+                                historic_avarages_cache_clp[client_name]['CLP'][f_id][year]['historic_avarages_clp'],
+                                num_dates
+                            )
+                            return
 
-                        historic_avarages = []
-                        historic_avarages_dates = []
-                        historic_avarages_clp = []
+                    # Compute historic averages sequentially for this year to avoid concurrent GDAL opens
+                    status_state[year] = 'Calculating'
+                    historic_avarages = []
+                    historic_avarages_dates = []
+                    historic_avarages_clp = []
 
-                        dates_for_field_bar = st.progress(0)
-                        with st.spinner(f'Calculating Historic Averages for {year}...'):
-                            # Sequential processing to avoid Fiona/GDAL concurrency issues
-                            for i, current_date in enumerate(historic_avarages_dates_for_field):
-                                try:
-                                    current_df = main.get_cuarted_df_for_field(src_df, f_id, current_date, metric, client_name)
-                                    current_avg = current_df[f'{metric}_{current_date}'].mean()
-                                except Exception as e:
-                                    st.warning(f'Failed to read metric for {current_date}: {e}')
-                                    current_avg = float('nan')
+                    for i, current_date in enumerate(dates_for_year):
+                        # Serialize any direct Fiona or GDAL calls
+                        try:
+                            with fiona_lock:
+                                current_df = main.get_cuarted_df_for_field(src_df, f_id, current_date, metric, client_name)
+                            current_avg = current_df[f'{metric}_{current_date}'].mean()
+                        except Exception:
+                            current_avg = float('nan')
 
-                                try:
-                                    current_df_clp = main.get_cuarted_df_for_field(src_df, f_id, current_date, 'CLP', client_name)
-                                    current_avg_clp = current_df_clp[f'CLP_{current_date}'].mean()
-                                except Exception as e:
-                                    st.warning(f'Failed to read CLP for {current_date}: {e}')
-                                    current_avg_clp = float('nan')
+                        try:
+                            with fiona_lock:
+                                current_df_clp = main.get_cuarted_df_for_field(src_df, f_id, current_date, 'CLP', client_name)
+                            current_avg_clp = current_df_clp[f'CLP_{current_date}'].mean()
+                        except Exception:
+                            current_avg_clp = float('nan')
 
-                                historic_avarages.append(current_avg)
-                                historic_avarages_dates.append(current_date)
-                                historic_avarages_clp.append(current_avg_clp)
+                        historic_avarages.append(current_avg)
+                        historic_avarages_dates.append(current_date)
+                        historic_avarages_clp.append(current_avg_clp)
 
-                                # Protect division by zero if no dates
-                                if num_historic_dates > 0:
-                                    dates_for_field_bar.progress((i + 1) / num_historic_dates)
+                        # update progress shared state
+                        progress_state[year] = (i + 1) / num_dates
+                        status_state[year] = f'Processing {i + 1} of {num_dates}'
 
-                        # Store computed results into caches for this year
+                    # Save results into shared caches under lock and persist to disk
+                    with cache_lock:
                         historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages'] = historic_avarages
                         historic_avarages_cache[client_name][metric][f_id][year]['historic_avarages_dates'] = historic_avarages_dates
                         historic_avarages_cache_clp[client_name]['CLP'][f_id][year]['historic_avarages_clp'] = historic_avarages_clp
 
-                        # Persist caches after computing each year's data
                         joblib.dump(historic_avarages_cache, historic_avarages_cache_path)
                         joblib.dump(historic_avarages_cache_clp, historic_avarages_cache_clp_path)
-                        st.info(f'Historic Averages for {year} saved in cache')
-                        st.write(f'Cache Path: {historic_avarages_cache_path}')
-                        st.write(f'Cache CLP Path: {historic_avarages_cache_clp_path}')
 
-                    # Build and display a separate plot for this year
-                    fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig.add_trace(
-                        go.Scatter(x=historic_avarages_dates, y=historic_avarages, name=f'{metric} Historic Averages ({year})'),
-                        secondary_y=False
-                    )
-                    fig.add_trace(
-                        go.Scatter(x=historic_avarages_dates, y=historic_avarages_clp, name=f'Cloud Cover ({year})'),
-                        secondary_y=True
-                    )
-                    fig.update_layout(title_text=f'{metric} Historic Averages for {field_name} (Field ID: {f_id}) in {year}')
-                    fig.update_xaxes(title_text='Date')
-                    fig.update_yaxes(title_text=f'{metric} Historic Averages', secondary_y=False)
-                    fig.update_yaxes(title_text='Cloud Cover', secondary_y=True)
-                    st.plotly_chart(fig)
+                    progress_state[year] = 1.0
+                    status_state[year] = 'Done'
+                    result_state[year] = (historic_avarages, historic_avarages_dates, historic_avarages_clp, num_dates)
+                    return
+
+                # Run one thread per year; each thread does sequential date processing internally
+                max_workers = min(len(selected_years), 4)
+                with st.spinner('Calculating Historic Averages for selected years...'):
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        futures = {executor.submit(process_year, y): y for y in selected_years}
+
+                        # Poll and update UI until all futures finish
+                        while not all(f.done() for f in futures):
+                            for year in selected_years:
+                                p = progress_state.get(year, 0.0)
+                                s = status_state.get(year, '')
+                                # update UI elements from main thread
+                                try:
+                                    progress_bars[year].progress(p)
+                                    if s:
+                                        status_placeholders[year].info(f'{year}: {s}')
+                                except Exception:
+                                    # ignore UI update errors to keep loop robust
+                                    pass
+                            time.sleep(0.1)
+
+                        # Final update after completion
+                        for year in selected_years:
+                            p = progress_state.get(year, 1.0)
+                            s = status_state.get(year, '')
+                            try:
+                                progress_bars[year].progress(p)
+                                if s:
+                                    status_placeholders[year].info(f'{year}: {s}')
+                            except Exception:
+                                pass
+
+                        # Collect results and display plots per year in the order of selected_years
+                        for year in selected_years:
+                            res = result_state.get(year)
+                            if res is None:
+                                st.warning(f'No results for {year}')
+                                continue
+
+                            historic_avarages, historic_avarages_dates, historic_avarages_clp, num_dates = res
+                            st.write(f'Found {num_dates} dates for field {f_id} in {year}')
+
+                            fig = make_subplots(specs=[[{"secondary_y": True}]])
+                            fig.add_trace(
+                                go.Scatter(x=historic_avarages_dates, y=historic_avarages, name=f'{metric} Historic Averages ({year})'),
+                                secondary_y=False
+                            )
+                            fig.add_trace(
+                                go.Scatter(x=historic_avarages_dates, y=historic_avarages_clp, name=f'Cloud Cover ({year})'),
+                                secondary_y=True
+                            )
+                            fig.update_layout(title_text=f'{metric} Historic Averages for {field_name} (Field ID: {f_id}) in {year}')
+                            fig.update_xaxes(title_text='Date')
+                            fig.update_yaxes(title_text=f'{metric} Historic Averages', secondary_y=False)
+                            fig.update_yaxes(title_text='Cloud Cover', secondary_y=True)
+                            st.plotly_chart(fig)
 
     else:
         st.info('Please Select A Field')
+
 
 
         
