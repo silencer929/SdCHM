@@ -60,13 +60,21 @@ for f in scripts_files:
         Scripts[key] = f.read()
 
 def calculate_bbox(df, field):
-    '''
-    Calculate the bounding box of a specfic field  ID in a  given data frame
-    '''
     field = int(field)
-    bbox = df.loc[df['Field_Id'] == field].bounds
-    r = bbox.iloc[0]
-    return [r.minx, r.miny, r.maxx, r.maxy]
+
+    # Filter the dataframe for the given field
+    subset = df.loc[df['Field_Id'] == field]
+
+    if subset.empty:
+        raise ValueError(
+            f"Field_Id {field} not found in dataframe. "
+            f"Available Field_Ids: {df['Field_Id'].unique().tolist()}"
+        )
+
+    # .bounds gives a DataFrame with minx, miny, maxx, maxy for each geometry
+    bbox = subset.bounds.iloc[0]
+
+    return [bbox.minx, bbox.miny, bbox.maxx, bbox.maxy]
 
 def tiff_to_geodataframe(im, metric, date, crs):
     '''
