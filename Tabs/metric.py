@@ -260,11 +260,19 @@ def app(metric):
         st.info('Please Select A Field and A Date')
 
 
-    # --- XGBoost model ---
-    if st.button("Run XGBoost Model", key=f"run_xgb_model_{metric}"):
-     with st.spinner("Training model, please wait..."):
-        modelling.train_test_model(src_df, f_id, metric, client_name)
-    st.success("Model finished running!")
+    # --- Model Selection and Training ---
+    st.subheader("Select Model to Run")
+
+    model_choice = st.selectbox(
+        "Choose a Model:",
+        ["XGBoost", "Ridge", "Lasso", "ElasticNet"],
+        key=f"model_choice_{metric}"
+        )
+
+    if st.button("Run Selected Model", key=f"run_model_{metric}"):
+        with st.spinner(f"Training {model_choice} model, please wait..."):
+            modelling.train_test_model(src_df, f_id, metric, client_name, model_type=model_choice.lower())
+        st.success(f"{model_choice} model finished running!")
 
     st.markdown('---')
     st.header('Show Historic Averages')
