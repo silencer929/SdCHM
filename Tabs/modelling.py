@@ -141,7 +141,7 @@ def train_test_model(src_df, f_id, metric, client_name, model_type="xgboost"):
             historic_values_train.append(avg_val)
 
     # 2. TEST DATA: 2024
-    year_test = '2024'
+    year_test = ['2024']
     historic_dates_test = []
     historic_values_test = []
 
