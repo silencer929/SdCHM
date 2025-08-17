@@ -14,6 +14,7 @@ import plotly.graph_objects as go
 from streamlit_folium import st_folium
 from plotly.subplots import make_subplots
 from concurrent.futures import ThreadPoolExecutor
+from sklearn.linear_model import Ridge, Lasso, ElasticNet
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
@@ -92,7 +93,7 @@ def calculate_historic_averages(src_df, f_id, metric, client_name, years):
 
         progress_bar = st.progress(0)
         with st.spinner(f"Calculating Historic Averages for {year}..."):
-            with ThreadPoolExecutor(max_workers=10) as executor:
+            with ThreadPoolExecutor(max_workers=30) as executor:
                 results = list(executor.map(fetch_data_for_date, historic_dates_for_year))
             for i, (date, avg, avg_clp) in enumerate(results):
                 historic_values.append(avg)
@@ -120,8 +121,6 @@ def calculate_historic_averages(src_df, f_id, metric, client_name, years):
 
 
 def train_test_model(src_df, f_id, metric, client_name, model_type="xgboost"):
-    from sklearn.linear_model import Ridge, Lasso, ElasticNet
-    import xgboost as xgb
 
     # 1. TRAINING DATA: 2020–2023
     years_train = ['2020', '2021', '2022', '2023']
