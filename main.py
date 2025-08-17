@@ -51,21 +51,42 @@ def get_available_dates_for_field(df, field, year, start_date='', end_date=''):
         return []
 
 def get_cuarted_df_for_field(df, field, date, metric, clientName):
+
+    # Try to locate existing curated file
     curated_date_path = utils.get_curated_location_img_path(clientName, metric, date, field)
 
+    # If no curated file exists, run the pipeline
     if curated_date_path is None or not os.path.exists(curated_date_path):
+        print(f"[INFO] Curated file not found for {clientName}, {metric}, {date}, field {field}. Running processing pipeline...")
         process.Download_image_in_given_date(clientName, metric, df, field, date)
         process.mask_downladed_image(clientName, metric, df, field, date)
         process.convert_maske_image_to_geodataframe(clientName, metric, df, field, date, df.crs)
+
+        # Re-check curated path
         curated_date_path = utils.get_curated_location_img_path(clientName, metric, date, field)
 
+    # Final check: file must exist now
     if curated_date_path is None or not os.path.exists(curated_date_path):
-        raise FileNotFoundError(f"Curated path not found after processing for {date}: {curated_date_path}")
+        raise FileNotFoundError(
+            f"Curated file not found after processing for {clientName}, {metric}, {date}, field {field}"
+        )
 
+    # Detect file format and read appropriately
+    ext = os.path.splitext(curated_date_path)[1].lower()
     try:
-        curated_df = gpd.read_file(curated_date_path)
+        if ext in [".geojson", ".json", ".shp", ".gpkg"]:
+            curated_df = gpd.read_file(curated_date_path)
+        elif ext in [".tif", ".tiff"]:
+            # Raster file — not directly usable as GeoDataFrame
+            # You may want to process with rasterio instead
+            with rasterio.open(curated_date_path) as src:
+                raise ValueError(f"Raster file found instead of vector: {curated_date_path}")
+        else:
+            raise ValueError(f"Unsupported file format: {curated_date_path}")
     except Exception as e:
-        raise ValueError(f"Failed to read curated file {curated_date_path}: {e}")
+        raise RuntimeError(f"Failed to read curated file {curated_date_path}: {e}")
+
+    return curated_df
 
 
 def get_True_color_data(df, field, date, clientName):
